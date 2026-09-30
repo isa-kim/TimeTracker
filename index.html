@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Log</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  .date { font-size: 13px; color: #8a8a8a; letter-spacing: 0.2px; }
+  .total { font-size: 32px; font-weight: 600; margin-top: 2px; }
+  .timer-box {
+    background: #f4f4f4;
+    border-radius: 14px;
+    padding: 18px;
+    margin: 24px 0 20px;
+  }
+  .timer-box.active { background: #1a1a1a; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  input[type=text] {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 0 14px;
+    height: 52px;
+    font-size: 16px;
+    outline: none;
+  }
+  button.icon-btn {
+    border: none;
+    border-radius: 10px;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .start-btn { background: #1a1a1a; }
+  .start-btn:disabled { background: #ccc; cursor: default; }
+  .stop-btn { background: #e5484d; }
+  .active-code { color: #aaa; font-size: 12px; }
+  .active-clock {
+    color: #fff;
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  .chip {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #444;
+  }
+  .section-label { font-size: 13px; color: #8a8a8a; margin-bottom: 8px; }
+  .totals-row, .session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 15px;
+    border-bottom: 1px solid #eee;
+  }
+  .session-row { font-size: 14px; color: #555; border-bottom: none; padding: 6px 0; }
+  .hrs { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .session-row .hrs { font-weight: 400; }
+  .del-btn, .edit-btn { border: none; background: none; cursor: pointer; padding: 2px; color: #ccc; font-size: 14px; }
+  .edit-btn { color: #999; font-size: 13px; }
+  .edit-modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+  }
+  .edit-modal {
+    background: #fff; border-radius: 16px 16px 0 0; padding: 20px 16px 28px;
+    width: 100%; max-width: 480px;
+  }
+  .edit-modal h3 { margin: 0 0 16px; font-size: 15px; }
+  .edit-field { margin-bottom: 14px; }
+  .edit-field label { display: block; font-size: 12px; color: #8a8a8a; margin-bottom: 4px; }
+  .edit-field input {
+    width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: 15px; outline: none;
+  }
+  .edit-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .edit-actions button {
+    flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .edit-save { background: #1a1a1a; color: #fff; }
+  .edit-cancel { background: #f4f4f4; color: #1a1a1a; }
+  .edit-delete { background: #fdecea; color: #e5484d; }
+  .export-row { display: flex; gap: 10px; margin-top: 24px; }
+  .export-btn {
+    flex: 1;
+    padding: 12px;
+    background: #f4f4f4;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #1a1a1a;
+  }
+  .export-btn.copied { background: #1a1a1a; color: #fff; }
+  .error { color: #e5484d; font-size: 13px; margin-bottom: 12px; }
+  svg { display: block; }
+  .day-block { margin-bottom: 16px; }
+  .day-header { font-size: 13px; font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .day-header .day-total { color: #8a8a8a; font-weight: 400; }
+  .day-header.today .day-name { color: #1a1a1a; }
+  .day-empty { font-size: 13px; color: #ccc; padding: 4px 0; }
+  .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .week-nav button {
+    border: none; background: #f4f4f4; border-radius: 8px;
+    width: 32px; height: 32px; cursor: pointer; font-size: 15px; color: #444;
+  }
+  .week-nav button:disabled { color: #ddd; cursor: default; }
+  .week-range { font-size: 13px; color: #555; font-weight: 600; }
+  table.week-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.week-table th, table.week-table td {
+    padding: 6px 4px; text-align: center; border-bottom: 1px solid #eee;
+  }
+  table.week-table th { color: #8a8a8a; font-weight: 600; font-size: 11px; }
+  table.week-table td.code-cell { text-align: left; font-weight: 600; font-size: 13px; }
+  table.week-table td.today-col, table.week-table th.today-col { background: #fafafa; }
+  table.week-table td.week-total-col, table.week-table th.week-total-col { font-weight: 700; background: #f4f4f4; }
+  table.week-table tr.total-row td { font-weight: 700; border-top: 2px solid #ddd; border-bottom: none; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+</style>
+</head>
+<body>
+
+<div class="date" id="dateLabel"></div>
+<div class="total" id="totalLabel">0.0h</div>
+
+<div class="timer-box" id="timerBox">
+  <div class="row" id="startRow">
+    <input type="text" id="codeInput" placeholder="Project code (e.g. 28205)" />
+    <button class="icon-btn start-btn" id="startBtn" disabled>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="6,4 20,12 6,20"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="error" id="errorLabel" style="display:none;"></div>
+
+<div class="chips" id="chips"></div>
+
+<div id="totalsSection" style="display:none;">
+  <div class="section-label">Today by project</div>
+  <div id="totalsList"></div>
+</div>
+
+<div id="sessionsSection" style="display:none; margin-top: 28px;">
+  <div class="section-label">Sessions today</div>
+  <div id="sessionsList"></div>
+</div>
+
+<div class="export-row" id="exportRow" style="display:none;">
+  <button class="export-btn" id="copyBtn">Copy week for email</button>
+  <button class="export-btn" id="csvBtn">Week CSV</button>
+</div>
+
+<div id="weekSection" style="margin-top: 32px;">
+  <div class="week-nav">
+    <button id="prevWeekBtn">‹</button>
+    <span class="week-range" id="weekRange"></span>
+    <button id="nextWeekBtn">›</button>
+  </div>
+  <div class="table-wrap">
+    <table class="week-table" id="weekTable"></table>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const STORAGE_KEY = 'time-log-entries-v1';
+
+function round1(n) { return Math.round(n * 10) / 10; }
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtClock(ms) {
+  const s = Math.floor(ms/1000);
+  const h = String(Math.floor(s/3600)).padStart(2,'0');
+  const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+  const sec = String(s%60).padStart(2,'0');
+  return h+':'+m+':'+sec;
+}
+function toDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function weekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day; // Monday as start
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+function weekDates(dateStr) {
+  const start = weekStart(dateStr);
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    dates.push(toDateStr(d));
+  }
+  return dates;
+}
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+let weekOffset = 0; // 0 = current week, -1 = last week, etc.
+
+let state = { entries: [], active: null };
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch (e) {}
+}
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    showError('');
+  } catch (e) {
+    showError('Save failed — storage may be full or private-browsing mode');
+  }
+}
+function showError(msg) {
+  const el = document.getElementById('errorLabel');
+  if (!msg) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+let tickInterval = null;
+
+function startTimer(code) {
+  const c = code.trim();
+  if (!c || state.active) return;
+  state.active = { code: c, startedAt: Date.now() };
+  document.getElementById('codeInput').value = '';
+  save();
+  render();
+}
+
+function stopTimer() {
+  if (!state.active) return;
+  const durationMs = Date.now() - state.active.startedAt;
+  const hours = round1(durationMs / 1000 / 3600);
+  state.entries.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,8),
+    code: state.active.code,
+    date: todayStr(),
+    hours: hours,
+    startedAt: state.active.startedAt,
+    endedAt: Date.now()
+  });
+  state.active = null;
+  save();
+  render();
+}
+
+function deleteEntry(id) {
+  state.entries = state.entries.filter(e => e.id !== id);
+  save();
+  render();
+}
+
+function updateEntry(id, newCode, newHours, newDate) {
+  const e = state.entries.find(en => en.id === id);
+  if (!e) return;
+  e.code = newCode.trim();
+  e.hours = round1(newHours);
+  e.date = newDate;
+  save();
+  render();
+}
+
+function openEditModal(id) {
+  const e = state.entries.find(en => en.id === id);
+  if (!e) return;
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="edit-modal-backdrop" id="modalBackdrop">
+      <div class="edit-modal">
+        <h3>Edit entry</h3>
+        <div class="edit-field">
+          <label>Project code</label>
+          <input type="text" id="editCode" value="${e.code}">
+        </div>
+        <div class="edit-field">
+          <label>Date</label>
+          <input type="date" id="editDate" value="${e.date}">
+        </div>
+        <div class="edit-field">
+          <label>Hours</label>
+          <input type="number" id="editHours" value="${e.hours}" step="0.1" min="0">
+        </div>
+        <div class="edit-actions">
+          <button class="edit-delete" id="editDeleteBtn">Delete</button>
+          <button class="edit-cancel" id="editCancelBtn">Cancel</button>
+          <button class="edit-save" id="editSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalBackdrop').onclick = (ev) => {
+    if (ev.target.id === 'modalBackdrop') closeModal();
+  };
+  document.getElementById('editCancelBtn').onclick = closeModal;
+  document.getElementById('editDeleteBtn').onclick = () => { deleteEntry(id); closeModal(); };
+  document.getElementById('editSaveBtn').onclick = () => {
+    const code = document.getElementById('editCode').value;
+    const date = document.getElementById('editDate').value;
+    const hours = parseFloat(document.getElementById('editHours').value);
+    if (!code.trim() || !date || isNaN(hours) || hours < 0) return;
+    updateEntry(id, code, hours, date);
+    closeModal();
+  };
+}
+
+function closeModal() {
+  document.getElementById('modalRoot').innerHTML = '';
+}
+
+function getTodayData() {
+  const today = todayStr();
+  const todayEntries = state.entries.filter(e => e.date === today);
+  const totalsByCode = {};
+  todayEntries.forEach(e => { totalsByCode[e.code] = round1((totalsByCode[e.code]||0) + e.hours); });
+  const sorted = todayEntries.slice().sort((a,b) => a.startedAt - b.startedAt);
+  const total = round1(Object.values(totalsByCode).reduce((a,b)=>a+b,0));
+  return { today, todayEntries, totalsByCode, sorted, total };
+}
+
+function getWeekData(offset) {
+  const base = new Date();
+  base.setDate(base.getDate() + offset * 7);
+  const dates = weekDates(toDateStr(base));
+  const byDate = {};
+  dates.forEach(d => { byDate[d] = state.entries.filter(e => e.date === d).sort((a,b) => a.startedAt - b.startedAt); });
+
+  // matrix: code -> { dateStr: hours }
+  const codes = [];
+  const matrix = {};
+  dates.forEach(d => {
+    byDate[d].forEach(e => {
+      if (!matrix[e.code]) { matrix[e.code] = {}; codes.push(e.code); }
+      matrix[e.code][d] = round1((matrix[e.code][d] || 0) + e.hours);
+    });
+  });
+  const uniqueCodes = [...new Set(codes)];
+
+  const dayTotals = {};
+  dates.forEach(d => {
+    dayTotals[d] = round1(uniqueCodes.reduce((sum, c) => sum + (matrix[c][d] || 0), 0));
+  });
+  const weekTotal = round1(Object.values(dayTotals).reduce((a,b) => a+b, 0));
+
+  const rowTotals = {};
+  uniqueCodes.forEach(c => {
+    rowTotals[c] = round1(dates.reduce((sum, d) => sum + (matrix[c][d] || 0), 0));
+  });
+
+  return { dates, byDate, codes: uniqueCodes, matrix, dayTotals, rowTotals, weekTotal };
+}
+
+function buildEmailHtml() {
+  const { dates, codes, matrix, dayTotals, rowTotals, weekTotal } = getWeekData(weekOffset);
+  const th = (s) => `<th style="border:1px solid #ccc;padding:6px 10px;background:#f4f4f4;font-family:sans-serif;font-size:13px;">${s}</th>`;
+  const td = (s, bold) => `<td style="border:1px solid #ccc;padding:6px 10px;text-align:center;font-family:sans-serif;font-size:13px;${bold ? 'font-weight:bold;' : ''}">${s}</td>`;
+  const tdLeft = (s, bold) => `<td style="border:1px solid #ccc;padding:6px 10px;text-align:left;font-family:sans-serif;font-size:13px;${bold ? 'font-weight:bold;' : ''}">${s}</td>`;
+
+  let html = '<table style="border-collapse:collapse;">';
+  html += '<tr>' + th('Project') + dates.map(d => th(d)).join('') + th('Week Total') + '</tr>';
+  codes.forEach(code => {
+    html += '<tr>' + tdLeft(code, true) +
+      dates.map(d => td(matrix[code][d] != null ? matrix[code][d].toFixed(1) : '')).join('') +
+      td(rowTotals[code].toFixed(1), true) + '</tr>';
+  });
+  html += '<tr>' + tdLeft('Total', true) +
+    dates.map(d => td(dayTotals[d].toFixed(1), true)).join('') +
+    td(weekTotal.toFixed(1), true) + '</tr>';
+  html += '</table>';
+  return html;
+}
+
+function buildEmailText() {
+  const { dates, codes, matrix, dayTotals, rowTotals, weekTotal } = getWeekData(weekOffset);
+  const header = ['Project', ...dates, 'Week Total'].join('\t');
+  const lines = [header];
+  codes.forEach(code => {
+    const row = [code, ...dates.map(d => (matrix[code][d] != null ? matrix[code][d].toFixed(1) : '')), rowTotals[code].toFixed(1)];
+    lines.push(row.join('\t'));
+  });
+  lines.push(['Total', ...dates.map(d => dayTotals[d].toFixed(1)), weekTotal.toFixed(1)].join('\t'));
+  return lines.join('\n');
+}
+
+function exportCsv() {
+  const { dates, codes, matrix, dayTotals, rowTotals, weekTotal } = getWeekData(weekOffset);
+  const rows = [['Project', ...dates, 'Week Total']];
+  codes.forEach(code => {
+    rows.push([code, ...dates.map(d => (matrix[code][d] != null ? matrix[code][d].toFixed(1) : '')), rowTotals[code].toFixed(1)]);
+  });
+  rows.push(['Total', ...dates.map(d => dayTotals[d].toFixed(1)), weekTotal.toFixed(1)]);
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'time-log-week-' + dates[0] + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function render() {
+  document.getElementById('dateLabel').textContent = todayStr();
+  const { todayEntries, totalsByCode, sorted, total } = getTodayData();
+  document.getElementById('totalLabel').textContent = total.toFixed(1) + 'h';
+
+  const timerBox = document.getElementById('timerBox');
+  if (state.active) {
+    timerBox.classList.add('active');
+    timerBox.innerHTML = `
+      <div class="row">
+        <div style="flex:1">
+          <div class="active-code">${state.active.code}</div>
+          <div class="active-clock" id="activeClock">00:00:00</div>
+        </div>
+        <button class="icon-btn stop-btn" id="stopBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><rect x="5" y="5" width="14" height="14"/></svg>
+        </button>
+      </div>`;
+    document.getElementById('stopBtn').onclick = stopTimer;
+    if (!tickInterval) {
+      tickInterval = setInterval(() => {
+        const el = document.getElementById('activeClock');
+        if (el && state.active) el.textContent = fmtClock(Date.now() - state.active.startedAt);
+      }, 1000);
+    }
+  } else {
+    timerBox.classList.remove('active');
+    clearInterval(tickInterval);
+    tickInterval = null;
+    timerBox.innerHTML = `
+      <div class="row" id="startRow">
+        <input type="text" id="codeInput" placeholder="Project code (e.g. 28205)" />
+        <button class="icon-btn start-btn" id="startBtn" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="6,4 20,12 6,20"/></svg>
+        </button>
+      </div>`;
+    const input = document.getElementById('codeInput');
+    const btn = document.getElementById('startBtn');
+    input.addEventListener('input', () => {
+      const has = input.value.trim().length > 0;
+      btn.disabled = !has;
+      btn.style.background = has ? '#1a1a1a' : '#ccc';
+      btn.style.cursor = has ? 'pointer' : 'default';
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') startTimer(input.value); });
+    btn.onclick = () => startTimer(input.value);
+  }
+
+  // chips
+  const chipsEl = document.getElementById('chips');
+  chipsEl.innerHTML = '';
+  if (!state.active) {
+    Object.keys(totalsByCode).forEach(code => {
+      const chip = document.createElement('button');
+      chip.className = 'chip';
+      chip.textContent = code;
+      chip.onclick = () => startTimer(code);
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  // totals
+  const totalsSection = document.getElementById('totalsSection');
+  const totalsList = document.getElementById('totalsList');
+  const codes = Object.entries(totalsByCode).sort((a,b) => b[1]-a[1]);
+  if (codes.length) {
+    totalsSection.style.display = 'block';
+    totalsList.innerHTML = codes.map(([code,hrs]) =>
+      `<div class="totals-row"><span>${code}</span><span class="hrs">${hrs.toFixed(1)}h</span></div>`
+    ).join('');
+  } else {
+    totalsSection.style.display = 'none';
+  }
+
+  // sessions
+  const sessionsSection = document.getElementById('sessionsSection');
+  const sessionsList = document.getElementById('sessionsList');
+  if (sorted.length) {
+    sessionsSection.style.display = 'block';
+    sessionsList.innerHTML = sorted.map(e =>
+      `<div class="session-row" data-id="${e.id}" style="cursor:pointer;">
+        <span>${e.code}</span>
+        <span style="display:flex;align-items:center;gap:10px;">
+          <span class="hrs">${e.hours.toFixed(1)}h</span>
+          <span class="edit-btn">✎</span>
+        </span>
+      </div>`
+    ).join('');
+    sessionsList.querySelectorAll('.session-row').forEach(row => {
+      row.onclick = () => openEditModal(row.getAttribute('data-id'));
+    });
+  } else {
+    sessionsSection.style.display = 'none';
+  }
+
+  document.getElementById('exportRow').style.display = todayEntries.length ? 'flex' : 'none';
+
+  renderWeekTable();
+}
+
+function renderWeekTable() {
+  const { dates, codes, matrix, dayTotals, rowTotals, weekTotal } = getWeekData(weekOffset);
+  const today = todayStr();
+
+  document.getElementById('weekRange').textContent =
+    weekOffset === 0 ? `This week (${dates[0]} ~ ${dates[6]})` : `${dates[0]} ~ ${dates[6]}`;
+  document.getElementById('nextWeekBtn').disabled = weekOffset >= 0;
+
+  const table = document.getElementById('weekTable');
+  if (codes.length === 0) {
+    table.innerHTML = `<tr><td style="padding:16px 0; color:#ccc; text-align:center;">No entries this week</td></tr>`;
+    return;
+  }
+
+  let html = '<tr><th style="text-align:left;">Code</th>';
+  dates.forEach(d => {
+    const isToday = d === today;
+    const dayName = DAY_LABELS[dates.indexOf(d)];
+    const dayNum = d.slice(5).replace('-', '/');
+    html += `<th class="${isToday ? 'today-col' : ''}">${dayName}<br>${dayNum}</th>`;
+  });
+  html += '<th class="week-total-col">Week<br>Total</th>';
+  html += '</tr>';
+
+  codes.forEach(code => {
+    html += `<tr><td class="code-cell">${code}</td>`;
+    dates.forEach(d => {
+      const isToday = d === today;
+      const v = matrix[code][d];
+      const clickable = v != null;
+      html += `<td class="${isToday ? 'today-col' : ''}" ${clickable ? `data-code="${code}" data-date="${d}" style="cursor:pointer;"` : ''}>${v != null ? v.toFixed(1) : '–'}</td>`;
+    });
+    html += `<td class="week-total-col">${rowTotals[code].toFixed(1)}</td>`;
+    html += '</tr>';
+  });
+
+  html += '<tr class="total-row"><td class="code-cell">Total</td>';
+  dates.forEach(d => {
+    const isToday = d === today;
+    html += `<td class="${isToday ? 'today-col' : ''}">${dayTotals[d].toFixed(1)}</td>`;
+  });
+  html += `<td class="week-total-col">${weekTotal.toFixed(1)}</td>`;
+  html += '</tr>';
+
+  table.innerHTML = html;
+  table.querySelectorAll('td[data-code]').forEach(td => {
+    td.onclick = () => openCellEntries(td.getAttribute('data-code'), td.getAttribute('data-date'));
+  });
+}
+
+function openCellEntries(code, date) {
+  const matches = state.entries.filter(e => e.code === code && e.date === date);
+  if (matches.length === 1) {
+    openEditModal(matches[0].id);
+    return;
+  }
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="edit-modal-backdrop" id="modalBackdrop">
+      <div class="edit-modal">
+        <h3>${code} — ${date}</h3>
+        ${matches.map(e => `
+          <div class="session-row" data-id="${e.id}" style="cursor:pointer;">
+            <span>${fmtClock(e.endedAt - e.startedAt)}</span>
+            <span class="hrs">${e.hours.toFixed(1)}h</span>
+          </div>`).join('')}
+        <div class="edit-actions">
+          <button class="edit-cancel" id="editCancelBtn" style="flex:1;">Close</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modalBackdrop').onclick = (ev) => {
+    if (ev.target.id === 'modalBackdrop') closeModal();
+  };
+  document.getElementById('editCancelBtn').onclick = closeModal;
+  root.querySelectorAll('.session-row').forEach(row => {
+    row.onclick = () => openEditModal(row.getAttribute('data-id'));
+  });
+}
+
+document.getElementById('prevWeekBtn').onclick = () => { weekOffset -= 1; renderWeekTable(); };
+document.getElementById('nextWeekBtn').onclick = () => { if (weekOffset < 0) { weekOffset += 1; renderWeekTable(); } };
+
+document.getElementById('copyBtn').onclick = async () => {
+  const btn = document.getElementById('copyBtn');
+  try {
+    const htmlStr = buildEmailHtml();
+    const textStr = buildEmailText();
+    if (window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([htmlStr], { type: 'text/html' }),
+          'text/plain': new Blob([textStr], { type: 'text/plain' })
+        })
+      ]);
+    } else {
+      await navigator.clipboard.writeText(textStr);
+    }
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy week for email'; btn.classList.remove('copied'); }, 2000);
+  } catch (e) {
+    showError('Copy failed — select and copy the log manually');
+  }
+};
+document.getElementById('csvBtn').onclick = exportCsv;
+
+load();
+render();
+</script>
+</body>
+</html>
